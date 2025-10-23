@@ -176,5 +176,7 @@ To run this Streamlit application:
 3. **Open your terminal or command prompt.**
 4. **Navigate** to the directory where you saved `app.py`.
 5. **Run the command:**
-   ```bash```
+  ```python
+# ... (rest of the markdown text) ...
+   ```bash
    streamlit run app.py
