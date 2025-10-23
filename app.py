@@ -1,4 +1,10 @@
-pip install joblib
+import joblib
+import os
+
+model_dir = r'C:\Users\GIFTY\OneDrive\Desktop\Churn Prediction\churn_prediction_model'
+model_path = os.path.join(model_dir, 'logistic_regression_model.pkl')
+loaded_model = joblib.load(model_path)
+
 import streamlit as st
 import pandas as pd
 import joblib
