@@ -1,94 +1,89 @@
-import os
 import joblib
 import pandas as pd
 import streamlit as st
 import numpy as np
 
-# --- Paths ---
-# This code assumes all files are in the *same directory* as app.py
+# --- 1. Load the *Single* Pipeline File ---
 try:
-    model_path = "logistic_regression_model.pkl"
-    encoder_path = "one_hot_encoder.pkl"
-    scaler_path = "scaler.pkl"
-
-    # --- Load files ---
-    loaded_model = joblib.load(model_path)
-    loaded_ohe = joblib.load(encoder_path)
-    loaded_scaler = joblib.load(scaler_path)
-
-    st.write("✅ Model, encoder, and scaler loaded successfully!")
-
-except FileNotFoundError as e:
-    st.error(f"Error loading files: {e}")
-    st.error(f"Fatal Error: Could not find model/preprocessor files. Please ensure 'logistic_regression_model.pkl', 'one_hot_encoder.pkl', and 'scaler.pkl' are in the same GitHub repository directory as 'app.py'.")
+    pipeline_path = "churn_pipeline.pkl"
+    model_pipeline = joblib.load(pipeline_path)
+    st.write("✅ Customer Churn Prediction Pipeline loaded successfully!")
+except FileNotFoundError:
+    st.error(f"Fatal Error: 'churn_pipeline.pkl' not found. Please re-train and upload the pipeline file.")
     st.stop()
 except Exception as e:
-    st.error(f"An unexpected error occurred while loading files: {e}")
+    st.error(f"An unexpected error occurred while loading the pipeline: {e}")
     st.stop()
 
 
-# Set the title and description of the application
+# Set the title and description
 st.title('Customer Churn Prediction App')
 st.markdown("""
 This application predicts whether a customer is likely to churn.
-Please input the customer's details below to get a prediction.
+Please input the customer's details to get a prediction.
 """)
 
-# Define the features
+# --- 2. Define Features Lists (for input fields) ---
 categorical_features = ["state", "voice.plan", "intl.plan"]
 numeric_features = [
     "area.code", "account.length", "voice.messages", "intl.mins", "intl.calls",
     "intl.charge", "day.mins", "day.calls", "eve.mins", "eve.calls",
     "night.mins", "night.calls", "customer.calls"
 ]
-# All features (for creating the initial DataFrame)
-all_features = categorical_features + numeric_features
+
+# Get the unique 'state' categories from the training data (if possible)
+# This is a bit more advanced, but good practice.
+# For simplicity, we'll use a placeholder if we can't get it from the pipeline.
+try:
+    # Accessing categories from the 'preprocessor' step in the pipeline
+    state_categories = model_pipeline.named_steps['preprocessor'].transformers_[1][1].categories_[0]
+    voice_plan_categories = model_pipeline.named_steps['preprocessor'].transformers_[1][1].categories_[1]
+    intl_plan_categories = model_pipeline.named_steps['preprocessor'].transformers_[1][1].categories_[2]
+except Exception as e:
+    st.warning(f"Could not load categories dynamically ({e}). Using default lists.")
+    # Manually add a few states if loading fails, or all 51
+    state_categories = ['OH', 'NY', 'KS', 'AL', 'WY'] # Add more or load from your 'P585 Churn.xlsx'
+    voice_plan_categories = ['no', 'yes']
+    intl_plan_categories = ['no', 'yes']
 
 
-# Create input fields for the features
+# --- 3. Create Input Fields ---
 st.header("Customer Information")
 
-# Input fields for categorical features
-st.subheader("Categorical Features (Used by Model)")
-# Use the categories stored inside the loaded one-hot encoder
-input_state = st.selectbox("State", loaded_ohe.categories_[0])
-input_voice_plan = st.selectbox("Voice Plan", loaded_ohe.categories_[1])
-input_intl_plan = st.selectbox("International Plan", loaded_ohe.categories_[2])
+st.subheader("Categorical Features")
+input_state = st.selectbox("State", state_categories)
+input_voice_plan = st.selectbox("Voice Plan", voice_plan_categories)
+input_intl_plan = st.selectbox("International Plan", intl_plan_categories)
 
-# Input fields for numerical features
-st.subheader("Numerical Features (NOTE: These appear to be IGNORED by the model)")
-st.warning("Based on the model's structure, the numerical inputs below are not used in the prediction.")
-
-# Arrange numerical inputs in columns for better layout
+st.subheader("Numerical Features")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    input_area_code = st.number_input("Area Code", min_value=0, value=415, step=1, disabled=True)
-    input_voice_messages = st.number_input("Voice Messages", min_value=0, value=0, disabled=True)
-    input_intl_calls = st.number_input("International Calls", min_value=0, value=0, disabled=True)
-    input_day_calls = st.number_input("Day Calls", min_value=0, value=100, disabled=True)
-    input_night_calls = st.number_input("Night Calls", min_value=0, value=100, disabled=True)
+    input_area_code = st.number_input("Area Code", min_value=0, value=415, step=1)
+    input_voice_messages = st.number_input("Voice Messages", min_value=0, value=0)
+    input_intl_calls = st.number_input("International Calls", min_value=0, value=0)
+    input_day_calls = st.number_input("Day Calls", min_value=0, value=100)
+    input_night_calls = st.number_input("Night Calls", min_value=0, value=100)
 
 with col2:
-    input_account_length = st.number_input("Account Length", min_value=0, value=100, disabled=True)
-    input_intl_mins = st.number_input("International Mins", min_value=0.0, value=10.0, format="%.2f", disabled=True)
-    input_day_mins = st.number_input("Day Mins", min_value=0.0, value=180.0, format="%.2f", disabled=True)
-    input_eve_calls = st.number_input("Evening Calls", min_value=0, value=100, disabled=True)
-    input_customer_calls = st.number_input("Customer Service Calls", min_value=0, value=1, disabled=True)
+    input_account_length = st.number_input("Account Length", min_value=0, value=100)
+    input_intl_mins = st.number_input("International Mins", min_value=0.0, value=10.0, format="%.2f")
+    input_day_mins = st.number_input("Day Mins", min_value=0.0, value=180.0, format="%.2f")
+    input_eve_calls = st.number_input("Evening Calls", min_value=0, value=100)
+    input_customer_calls = st.number_input("Customer Service Calls", min_value=0, value=1)
 
 with col3:
-    input_intl_charge = st.number_input("International Charge", min_value=0.0, value=2.70, format="%.2f", disabled=True)
-    input_eve_mins = st.number_input("Evening Mins", min_value=0.0, value=200.0, format="%.2f", disabled=True)
-    input_night_mins = st.number_input("Night Mins", min_value=0.0, value=200.0, format="%.2f", disabled=True)
-
+    input_intl_charge = st.number_input("International Charge", min_value=0.0, value=2.70, format="%.2f")
+    input_eve_mins = st.number_input("Evening Mins", min_value=0.0, value=200.0, format="%.2f")
+    input_night_mins = st.number_input("Night Mins", min_value=0.0, value=200.0, format="%.2f")
 
 # Add a submit button
 submit_button = st.button("Predict Churn")
 
-# --- Prediction Logic (Triggered by button click) ---
+# --- 4. Prediction Logic (MUCH SIMPLER) ---
 if submit_button:
     try:
-        # 1. Collect *all* user inputs just to create the DataFrame
+        # 1. Collect user inputs into a dictionary
         user_input_dict = {
             "state": input_state,
             "voice.plan": input_voice_plan,
@@ -107,61 +102,36 @@ if submit_button:
             "night.calls": input_night_calls,
             "customer.calls": input_customer_calls,
         }
-
-        # 2. Create a pandas DataFrame from the dictionary
-        user_df = pd.DataFrame([user_input_dict], columns=all_features)
         
-        # 3. Apply the *exact* (and unusual) preprocessing steps from training
-        
-        # Get *only* the categorical features from the user's DF
-        user_df_categorical = user_df[categorical_features]
-        st.write("Input Features (Categorical Only):")
-        st.dataframe(user_df_categorical)
+        # 2. Create a DataFrame from the dictionary
+        # The column order *must match* the order in the lists
+        column_order = numeric_features + categorical_features
+        user_df = pd.DataFrame([user_input_dict])[column_order]
 
-        # Apply One-Hot Encoding to categorical features (Produces 55 features)
-        user_categorical_encoded = loaded_ohe.transform(user_df_categorical)
+        st.write("User Input DataFrame:")
+        st.dataframe(user_df)
 
-        # Apply Scaling to the ONE-HOT-ENCODED features (Produces 55 features)
-        # This is the final data the model expects
-        user_final_processed = loaded_scaler.transform(user_categorical_encoded) 
+        # 3. Make prediction
+        # The pipeline handles *all* preprocessing (scaling and OHE)
+        prediction = model_pipeline.predict(user_df)
+        prediction_proba = model_pipeline.predict_proba(user_df)
 
-        # 4. (No concatenation needed)
-        st.write("Processed Data Shape (for debugging):", user_final_processed.shape)
-
-
-        # 5. Make prediction
-        prediction = loaded_model.predict(user_final_processed)
-        prediction_proba = loaded_model.predict_proba(user_final_processed)
-
-        # 6. Display the prediction result
+        # 4. Display result
         st.subheader("Prediction Result")
-        
-        prob_churn = prediction_proba[0][1]
+        prob_churn = prediction_proba[0][1] # Assuming 'yes' is the 2nd class
         
         if prediction[0] == 'yes':
             st.error(f"This customer is likely to **CHURN** (Probability: {prob_churn:.0%})")
         else:
             st.success(f"This customer is likely to **NOT CHURN** (Churn Probability: {prob_churn:.0%})")
 
-        st.markdown("---")
-        st.write(f"Confidence (Churn): {prediction_proba[0][1]:.2f}")
-        st.write(f"Confidence (Not Churn): {prediction_proba[0][0]:.2f}")
-        st.write("Note: This prediction is based *only* on the customer's State, Voice Plan, and International Plan.")
-
     except Exception as e:
         st.error(f"An error occurred during prediction: {e}")
 
-
-# Add instructions on how to run the application
+# Sidebar
 st.sidebar.header("How to Run")
 st.sidebar.markdown("""
-To run this Streamlit application:
-
 1. **Save** this code as `app.py`.
-2. **Ensure** you have the files `logistic_regression_model.pkl`, `scaler.pkl`, and `one_hot_encoder.pkl` in the **same directory** as `app.py`.
-3. **Open your terminal or command prompt.**
-4. **Navigate** to the directory where you saved `app.py`.
-5. **Run the command:**
-   ```bash
-   streamlit run app.py
+2. **Ensure** you have the new `churn_pipeline.pkl` in the **same directory**.
+3. **Run:** `streamlit run app.py`
 """)
