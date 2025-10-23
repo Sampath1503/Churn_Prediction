@@ -1,15 +1,30 @@
-import joblib
 import os
+import joblib
+import pandas as pd
+import streamlit as st
+
+
+# --- Paths ---
+base_dir = os.path.dirname(__file__)
+model_path = os.path.join(base_dir, 'logistic_regression_model.pkl')
+encoder_path = os.path.join(base_dir, 'one_hot_encoder.pkl')
+scaler_path = os.path.join(base_dir, 'scaler.pkl')
+data_path = os.path.join(base_dir, 'P585 Churn.xlsx')
+
+# --- Load files ---
+loaded_model = joblib.load(model_path)
+encoder = joblib.load(encoder_path)
+scaler = joblib.load(scaler_path)
+data = pd.read_excel(data_path)
+
+# Just to confirm data loaded
+st.write("✅ Model, encoder, scaler, and dataset loaded successfully!")
 
 model_dir = r'C:\Users\GIFTY\OneDrive\Desktop\Churn Prediction\churn_prediction_model'
 model_path = os.path.join(model_dir, 'logistic_regression_model.pkl')
 loaded_model = joblib.load(model_path)
 
-import streamlit as st
-import pandas as pd
-import joblib
-import os
-import numpy as np
+
 
 # Define the directory where the model and preprocessing objects are saved
 model_dir = 'churn_prediction_model'
