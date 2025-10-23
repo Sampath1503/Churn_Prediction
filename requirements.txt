@@ -1,10 +1,6 @@
 streamlit
 pandas
 numpy
-scikit-learn
-joblib
-imbalanced-learn
-scipy
-openpyxl
-imblearn
 scikit-learn==1.5.2
+imbalanced-learn
+openpyxl
