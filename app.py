@@ -2,7 +2,7 @@ import os
 import joblib
 import pandas as pd
 import streamlit as st
-import numpy as np  # <-- Added this import
+import numpy as np
 
 # --- Paths ---
 # This code assumes all files are in the *same directory* as app.py
@@ -11,13 +11,11 @@ try:
     model_path = "logistic_regression_model.pkl"
     encoder_path = "one_hot_encoder.pkl"
     scaler_path = "scaler.pkl"
-    # data_path = "P585 Churn.xlsx" # Not needed for the app, only for training
 
     # --- Load files ---
     loaded_model = joblib.load(model_path)
     loaded_ohe = joblib.load(encoder_path) # Changed variable name for clarity
     loaded_scaler = joblib.load(scaler_path) # Changed variable name for clarity
-    # data = pd.read_excel(data_path) # You don't need to load the whole dataset in the app
 
     # Just to confirm data loaded
     st.write("✅ Model, encoder, and scaler loaded successfully!")
@@ -47,7 +45,6 @@ numeric_features = [
 ]
 # The final order of columns *after* processing
 # This MUST match the order the model was trained on
-# (Assuming categoricals were first, then numericals)
 all_features = categorical_features + numeric_features
 
 
@@ -122,22 +119,26 @@ if submit_button:
         st.write("User Input DataFrame (Before Preprocessing):")
         st.dataframe(user_df)
 
-        # 3. Apply the *correct* preprocessing steps
+        # 3. Apply the *exact* (and unusual) preprocessing steps from training
         
         # Separate categorical and numerical features from the user's DF
         user_df_categorical = user_df[categorical_features]
         user_df_numeric = user_df[numeric_features]
 
-        # Apply One-Hot Encoding to categorical features
+        # Apply One-Hot Encoding to categorical features (Produces 55 features)
         user_categorical_encoded = loaded_ohe.transform(user_df_categorical)
 
-        # Apply Scaling to numerical features
-        user_numeric_scaled = loaded_scaler.transform(user_df_numeric)
+        # Apply Scaling to the ONE-HOT-ENCODED features (as per the error message)
+        user_categorical_scaled = loaded_scaler.transform(user_categorical_encoded) 
+
+        # Convert the raw numeric features to a numpy array (13 features)
+        user_numeric_raw = user_df_numeric.to_numpy()
 
         # 4. Concatenate the processed features
-        # We use np.hstack (horizontal stack) to combine the arrays
-        # The order MUST match the order during training (e.g., categoricals first, then numericals)
-        user_final_processed = np.hstack((user_categorical_encoded, user_numeric_scaled))
+        # We assume the training order was (scaled categoricals, raw numericals)
+        # This will result in 55 + 13 = 68 features
+        user_final_processed = np.hstack((user_categorical_scaled, user_numeric_raw))
+
 
         st.write("Processed Data Shape (for debugging):", user_final_processed.shape)
 
@@ -178,5 +179,4 @@ To run this Streamlit application:
 5. **Run the command:**
    ```bash
    streamlit run app.py
-   ```
 """)
