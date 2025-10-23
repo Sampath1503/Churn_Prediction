@@ -5,3 +5,5 @@ scikit-learn
 joblib
 imbalanced-learn
 scipy
+openpyxl
+imblearn
