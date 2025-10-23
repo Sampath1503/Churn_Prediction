@@ -178,3 +178,5 @@ To run this Streamlit application:
 5. **Run the command:**
    ```bash
    streamlit run app.py
+   ```
+""")
