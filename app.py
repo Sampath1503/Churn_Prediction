@@ -3,10 +3,11 @@ import joblib
 import pandas as pd
 import streamlit as st
 
+model_path = os.path.join(os.getcwd(), 'churn_prediction', 'logistic_regression_model.pkl')
 
 # --- Paths ---
 base_dir = os.path.dirname(__file__)
-model_path = os.path.join(base_dir, 'logistic_regression_model.pkl')
+model_path = os.path.join(os.getcwd(), 'churn_prediction', 'logistic_regression_model.pkl')
 encoder_path = os.path.join(base_dir, 'one_hot_encoder.pkl')
 scaler_path = os.path.join(base_dir, 'scaler.pkl')
 data_path = os.path.join(base_dir, 'P585 Churn.xlsx')
