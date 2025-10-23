@@ -2,38 +2,33 @@ import os
 import joblib
 import pandas as pd
 import streamlit as st
-
-model_path = os.path.join(os.getcwd(), 'churn_prediction', 'logistic_regression_model.pkl')
+import numpy as np  # <-- Added this import
 
 # --- Paths ---
-base_dir = os.path.dirname(__file__)
-model_path = os.path.join(os.getcwd(), 'churn_prediction', 'logistic_regression_model.pkl')
-encoder_path = os.path.join(base_dir, 'one_hot_encoder.pkl')
-scaler_path = os.path.join(base_dir, 'scaler.pkl')
-data_path = os.path.join(base_dir, 'P585 Churn.xlsx')
+# This code assumes all files are in the *same directory* as app.py
+# This is the simplest and recommended structure for Streamlit deployment.
+try:
+    model_path = "logistic_regression_model.pkl"
+    encoder_path = "one_hot_encoder.pkl"
+    scaler_path = "scaler.pkl"
+    # data_path = "P585 Churn.xlsx" # Not needed for the app, only for training
 
-# --- Load files ---
-loaded_model = joblib.load(model_path)
-encoder = joblib.load(encoder_path)
-scaler = joblib.load(scaler_path)
-data = pd.read_excel(data_path)
+    # --- Load files ---
+    loaded_model = joblib.load(model_path)
+    loaded_ohe = joblib.load(encoder_path) # Changed variable name for clarity
+    loaded_scaler = joblib.load(scaler_path) # Changed variable name for clarity
+    # data = pd.read_excel(data_path) # You don't need to load the whole dataset in the app
 
-# Just to confirm data loaded
-st.write("✅ Model, encoder, scaler, and dataset loaded successfully!")
+    # Just to confirm data loaded
+    st.write("✅ Model, encoder, and scaler loaded successfully!")
 
-model_dir = r'C:\Users\GIFTY\OneDrive\Desktop\Churn Prediction\churn_prediction_model'
-model_path = os.path.join(model_dir, 'logistic_regression_model.pkl')
-loaded_model = joblib.load(model_path)
-
-
-
-# Define the directory where the model and preprocessing objects are saved
-model_dir = 'churn_prediction_model'
-
-# Load the saved model, scaler, and one-hot encoder
-loaded_model = joblib.load(os.path.join(model_dir, 'logistic_regression_model.pkl'))
-loaded_scaler = joblib.load(os.path.join(model_dir, 'scaler.pkl'))
-loaded_ohe = joblib.load(os.path.join(model_dir, 'one_hot_encoder.pkl'))
+except FileNotFoundError as e:
+    st.error(f"Error loading files: {e}")
+    st.error(f"Fatal Error: Could not find model/preprocessor files. Please ensure 'logistic_regression_model.pkl', 'one_hot_encoder.pkl', and 'scaler.pkl' are in the same GitHub repository directory as 'app.py'.")
+    st.stop() # Stop the app if files can't be loaded
+except Exception as e:
+    st.error(f"An unexpected error occurred while loading files: {e}")
+    st.stop()
 
 
 # Set the title and description of the application
@@ -43,21 +38,17 @@ This application predicts whether a customer is likely to churn based on their t
 Please input the customer's details below to get a prediction.
 """)
 
-# Define the features the model expects (excluding 'Unnamed: 0' and dropped correlated features)
-# Based on the notebook, the features used for encoding and training were:
-# 'state', 'area.code', 'account.length', 'voice.plan', 'voice.messages',
-# 'intl.plan', 'intl.mins', 'intl.calls', 'intl.charge', 'day.mins',
-# 'day.calls', 'eve.mins', 'eve.calls', 'night.mins', 'night.calls',
-# 'customer.calls'
-# From these, 'state', 'voice.plan', and 'intl.plan' were one-hot encoded.
-# The numeric features were the remaining ones.
-
+# Define the features the model expects
 categorical_features = ["state", "voice.plan", "intl.plan"]
 numeric_features = [
     "area.code", "account.length", "voice.messages", "intl.mins", "intl.calls",
     "intl.charge", "day.mins", "day.calls", "eve.mins", "eve.calls",
     "night.mins", "night.calls", "customer.calls"
 ]
+# The final order of columns *after* processing
+# This MUST match the order the model was trained on
+# (Assuming categoricals were first, then numericals)
+all_features = categorical_features + numeric_features
 
 
 # Create input fields for the features
@@ -65,6 +56,7 @@ st.header("Customer Information")
 
 # Input fields for categorical features
 st.subheader("Categorical Features")
+# Use the categories stored inside the loaded one-hot encoder
 input_state = st.selectbox("State", loaded_ohe.categories_[0])
 input_voice_plan = st.selectbox("Voice Plan", loaded_ohe.categories_[1])
 input_intl_plan = st.selectbox("International Plan", loaded_ohe.categories_[2])
@@ -85,16 +77,16 @@ with col1:
 
 with col2:
     input_account_length = st.number_input("Account Length", min_value=0, value=100)
-    input_intl_mins = st.number_input("International Mins", min_value=0.0, value=10.0)
-    input_day_mins = st.number_input("Day Mins", min_value=0.0, value=180.0)
+    input_intl_mins = st.number_input("International Mins", min_value=0.0, value=10.0, format="%.2f")
+    input_day_mins = st.number_input("Day Mins", min_value=0.0, value=180.0, format="%.2f")
     input_eve_calls = st.number_input("Evening Calls", min_value=0, value=100)
     input_customer_calls = st.number_input("Customer Service Calls", min_value=0, value=1)
 
 
 with col3:
-    input_intl_charge = st.number_input("International Charge", min_value=0.0, value=2.70)
-    input_eve_mins = st.number_input("Evening Mins", min_value=0.0, value=200.0)
-    input_night_mins = st.number_input("Night Mins", min_value=0.0, value=200.0)
+    input_intl_charge = st.number_input("International Charge", min_value=0.0, value=2.70, format="%.2f")
+    input_eve_mins = st.number_input("Evening Mins", min_value=0.0, value=200.0, format="%.2f")
+    input_night_mins = st.number_input("Night Mins", min_value=0.0, value=200.0, format="%.2f")
 
 
 # Add a submit button
@@ -102,106 +94,87 @@ submit_button = st.button("Predict Churn")
 
 # --- Prediction Logic (Triggered by button click) ---
 if submit_button:
-    # 1. Collect user inputs into a dictionary
-    user_input_dict = {
-        "state": input_state,
-        "area.code": input_area_code,
-        "account.length": input_account_length,
-        "voice.plan": input_voice_plan,
-        "voice.messages": input_voice_messages,
-        "intl.plan": input_intl_plan,
-        "intl.mins": input_intl_mins,
-        "intl.calls": input_intl_calls,
-        "intl.charge": input_intl_charge,
-        "day.mins": input_day_mins,
-        "day.calls": input_day_calls,
-        "eve.mins": input_eve_mins,
-        "eve.calls": input_eve_calls,
-        "night.mins": input_night_mins,
-        "night.calls": input_night_calls,
-        "customer.calls": input_customer_calls,
-        # Note: 'Unnamed: 0', 'day.charge', 'eve.charge', 'night.charge' were dropped
-    }
+    try:
+        # 1. Collect user inputs into a dictionary
+        user_input_dict = {
+            "state": input_state,
+            "voice.plan": input_voice_plan,
+            "intl.plan": input_intl_plan,
+            "area.code": input_area_code,
+            "account.length": input_account_length,
+            "voice.messages": input_voice_messages,
+            "intl.mins": input_intl_mins,
+            "intl.calls": input_intl_calls,
+            "intl.charge": input_intl_charge,
+            "day.mins": input_day_mins,
+            "day.calls": input_day_calls,
+            "eve.mins": input_eve_mins,
+            "eve.calls": input_eve_calls,
+            "night.mins": input_night_mins,
+            "night.calls": input_night_calls,
+            "customer.calls": input_customer_calls,
+        }
 
-    # 2. Create a pandas DataFrame from the dictionary
-    # Define the column order explicitly based on how X_train was structured before encoding
-    # This order should match the original features used after dropping 'Unnamed: 0' and the correlated columns.
-    # Looking back at the notebook, the columns in X_train (before one-hot encoding) were:
-    # ['Unnamed: 0', 'state', 'area.code', 'account.length', 'voice.plan', 'voice.messages',
-    #  'intl.plan', 'intl.mins', 'intl.calls', 'intl.charge', 'day.mins', 'day.calls',
-    #  'eve.mins', 'eve.calls', 'night.mins', 'night.calls', 'customer.calls']
-    # After dropping 'Unnamed: 0', 'day.charge', 'eve.charge', 'night.charge', the order was preserved for the remaining.
-    # Let's reconstruct that expected order for the input DataFrame.
+        # 2. Create a pandas DataFrame from the dictionary
+        # Ensure the column order matches the 'all_features' list
+        user_df = pd.DataFrame([user_input_dict], columns=all_features)
 
-    expected_columns_order = [
-        'state', 'area.code', 'account.length', 'voice.plan', 'voice.messages',
-        'intl.plan', 'intl.mins', 'intl.calls', 'intl.charge', 'day.mins', 'day.calls',
-        'eve.mins', 'eve.calls', 'night.mins', 'night.calls', 'customer.calls'
-    ]
+        st.write("User Input DataFrame (Before Preprocessing):")
+        st.dataframe(user_df)
 
+        # 3. Apply the *correct* preprocessing steps
+        
+        # Separate categorical and numerical features from the user's DF
+        user_df_categorical = user_df[categorical_features]
+        user_df_numeric = user_df[numeric_features]
 
-    user_df = pd.DataFrame([user_input_dict], columns=expected_columns_order)
+        # Apply One-Hot Encoding to categorical features
+        user_categorical_encoded = loaded_ohe.transform(user_df_categorical)
 
-    st.write("User Input DataFrame (Before Preprocessing):")
-    st.dataframe(user_df)
+        # Apply Scaling to numerical features
+        user_numeric_scaled = loaded_scaler.transform(user_df_numeric)
 
-    # 3. Apply the same preprocessing steps
+        # 4. Concatenate the processed features
+        # We use np.hstack (horizontal stack) to combine the arrays
+        # The order MUST match the order during training (e.g., categoricals first, then numericals)
+        user_final_processed = np.hstack((user_categorical_encoded, user_numeric_scaled))
 
-    # Separate categorical and numerical features
-    user_df_categorical = user_df[categorical_features]
-    user_df_numeric = user_df[numeric_features]
+        st.write("Processed Data Shape (for debugging):", user_final_processed.shape)
 
-    # Apply One-Hot Encoding to categorical features
-    user_df_categorical_encoded = loaded_ohe.transform(user_df_categorical)
-    # Convert the encoded array back to a DataFrame for easier handling and column naming
-    user_df_categorical_encoded_df = pd.DataFrame(
-        user_df_categorical_encoded,
-        columns=loaded_ohe.get_feature_names_out(categorical_features)
-    )
+        # 5. Make prediction
+        prediction = loaded_model.predict(user_final_processed)
+        prediction_proba = loaded_model.predict_proba(user_final_processed)
 
-    # Apply Scaling to numerical features
-    # Note: Based on the notebook, scaling was applied to the one-hot encoded features,
-    # which is unusual. However, to match the training pipeline exactly, we will apply
-    # the scaler to the one-hot encoded features. This might need adjustment based on
-    # the actual training pipeline used for the final saved model.
-    # Assuming the model was trained on the scaled, one-hot encoded features:
-    user_df_final_processed = loaded_scaler.transform(user_df_categorical_encoded_df)
+        # 6. Display the prediction result
+        st.subheader("Prediction Result")
+        
+        # Get the probability for the 'yes' class (which is at index 1)
+        prob_churn = prediction_proba[0][1]
+        
+        if prediction[0] == 'yes':
+            st.error(f"This customer is likely to **CHURN** (Probability: {prob_churn:.0%})")
+        else:
+            st.success(f"This customer is likely to **NOT CHURN** (Churn Probability: {prob_churn:.0%})")
 
-    st.write("Processed User Input (After One-Hot Encoding and Scaling):")
-    st.dataframe(pd.DataFrame(user_df_final_processed)) # Displaying as DataFrame for readability
+        st.markdown("---")
+        st.write(f"Confidence (Churn): {prediction_proba[0][1]:.2f}")
+        st.write(f"Confidence (Not Churn): {prediction_proba[0][0]:.2f}")
+        st.write("Note: This prediction is based on the trained Logistic Regression model.")
 
-    # 4. Make prediction
-    prediction = loaded_model.predict(user_df_final_processed)
-    prediction_proba = loaded_model.predict_proba(user_df_final_processed)
+    except Exception as e:
+        st.error(f"An error occurred during prediction: {e}")
+        st.error("This often happens if the input data format doesn't match what the model was trained on.")
 
-    # 5. Display the prediction result
-    st.subheader("Prediction Result")
-    if prediction[0] == 'yes':
-        st.error("This customer is likely to **CHURN**.")
-        st.write(f"Probability of Churn: **{prediction_proba[0][1]:.2f}**")
-        st.write(f"Probability of Not Churning: {prediction_proba[0][0]:.2f}")
-    else:
-        st.success("This customer is likely to **NOT CHURN**.")
-        st.write(f"Probability of Not Churning: **{prediction_proba[0][0]:.2f}**")
-        st.write(f"Probability of Churn: {prediction_proba[0][1]:.2f}")
-
-    st.markdown("---")
-    st.write("Note: This prediction is based on the trained Logistic Regression model.")
 
 # Add instructions on how to run the application
 st.sidebar.header("How to Run")
 st.sidebar.markdown("""
 To run this Streamlit application:
 
-1. **Save** the code above as `app.py`.
-2. **Ensure** you have Streamlit and necessary libraries (`pandas`, `joblib`, `numpy`, `scikit-learn`, `imblearn`) installed (`pip install streamlit pandas joblib numpy scikit-learn imblearn`).
-3. **Ensure** you have the `churn_prediction_model` directory in the same location as `app.py`, containing the saved `logistic_regression_model.pkl`, `scaler.pkl`, and `one_hot_encoder.pkl` files.
-4. **Open your terminal or command prompt.**
-5. **Navigate** to the directory where you saved `app.py`.
-6. **Run the command:**
+1. **Save** this code as `app.py`.
+2. **Ensure** you have the files `logistic_regression_model.pkl`, `scaler.pkl`, and `one_hot_encoder.pkl` in the **same directory** as `app.py`.
+3. **Open your terminal or command prompt.**
+4. **Navigate** to the directory where you saved `app.py`.
+5. **Run the command:**
    ```bash
    streamlit run app.py
-   ```
-
-This will open the application in your web browser.
-""")
