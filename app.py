@@ -7,7 +7,6 @@ import numpy as np
 try:
     pipeline_path = "churn_pipeline.pkl"
     model_pipeline = joblib.load(pipeline_path)
-    st.write("✅ Customer Churn Prediction Pipeline loaded successfully!")
 except FileNotFoundError:
     st.error(f"Fatal Error: 'churn_pipeline.pkl' not found. Please re-train and upload the pipeline file.")
     st.stop()
