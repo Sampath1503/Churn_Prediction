@@ -4,14 +4,18 @@ import streamlit as st
 import numpy as np
 
 # --- 1. Load the *Single* Pipeline File ---
+# This file MUST be created from your notebook and include all steps
+# (Preprocessor, SMOTE, and the Model)
 try:
     pipeline_path = "churn_pipeline.pkl"
     model_pipeline = joblib.load(pipeline_path)
+    st.write("✅ Customer Churn Prediction Pipeline loaded successfully!")
 except FileNotFoundError:
-    st.error(f"Fatal Error: 'churn_pipeline.pkl' not found. Please re-train and upload the pipeline file.")
+    st.error(f"Fatal Error: 'churn_pipeline.pkl' not found. Please re-train and upload the pipeline file from your notebook.")
     st.stop()
 except Exception as e:
     st.error(f"An unexpected error occurred while loading the pipeline: {e}")
+    st.error("This is often a scikit-learn version mismatch. Check your requirements.txt file.")
     st.stop()
 
 
@@ -19,7 +23,7 @@ except Exception as e:
 st.title('Customer Churn Prediction App')
 st.markdown("""
 This application predicts whether a customer is likely to churn.
-Please input the customer's details to get a prediction.
+Please input the customer's details below to get a prediction.
 """)
 
 # --- 2. Define Features Lists (for input fields) ---
@@ -30,23 +34,22 @@ numeric_features = [
     "night.mins", "night.calls", "customer.calls"
 ]
 
-# Get the unique 'state' categories from the training data (if possible)
-# This is a bit more advanced, but good practice.
-# For simplicity, we'll use a placeholder if we can't get it from the pipeline.
+# --- 3. Get Dropdown Categories from the Pipeline ---
+# This makes your app robust by using the *exact* categories from training
 try:
     # Accessing categories from the 'preprocessor' step in the pipeline
     state_categories = model_pipeline.named_steps['preprocessor'].transformers_[1][1].categories_[0]
     voice_plan_categories = model_pipeline.named_steps['preprocessor'].transformers_[1][1].categories_[1]
     intl_plan_categories = model_pipeline.named_steps['preprocessor'].transformers_[1][1].categories_[2]
 except Exception as e:
-    st.warning(f"Could not load categories dynamically ({e}). Using default lists.")
-    # Manually add a few states if loading fails, or all 51
-    state_categories = ['OH', 'NY', 'KS', 'AL', 'WY'] # Add more or load from your 'P585 Churn.xlsx'
+    st.warning(f"Could not load categories dynamically. Using default lists. Error: {e}")
+    # Fallback lists if the categories can't be loaded from the pipeline
+    state_categories = ['OH', 'NY', 'KS', 'AL', 'WY', 'TX', 'IN'] # Add more if needed
     voice_plan_categories = ['no', 'yes']
     intl_plan_categories = ['no', 'yes']
 
 
-# --- 3. Create Input Fields ---
+# --- 4. Create Input Fields ---
 st.header("Customer Information")
 
 st.subheader("Categorical Features")
@@ -79,7 +82,7 @@ with col3:
 # Add a submit button
 submit_button = st.button("Predict Churn")
 
-# --- 4. Prediction Logic (MUCH SIMPLER) ---
+# --- 5. Prediction Logic ---
 if submit_button:
     try:
         # 1. Collect user inputs into a dictionary
@@ -103,7 +106,7 @@ if submit_button:
         }
         
         # 2. Create a DataFrame from the dictionary
-        # The column order *must match* the order in the lists
+        # The column order *must match* the order your preprocessor expects
         column_order = numeric_features + categorical_features
         user_df = pd.DataFrame([user_input_dict])[column_order]
 
@@ -111,13 +114,16 @@ if submit_button:
         st.dataframe(user_df)
 
         # 3. Make prediction
-        # The pipeline handles *all* preprocessing (scaling and OHE)
+        # The pipeline handles *all* preprocessing (scaling, OHE)
         prediction = model_pipeline.predict(user_df)
         prediction_proba = model_pipeline.predict_proba(user_df)
 
         # 4. Display result
         st.subheader("Prediction Result")
-        prob_churn = prediction_proba[0][1] # Assuming 'yes' is the 2nd class
+        
+        # Find the index of the 'yes' class
+        yes_class_index = np.where(model_pipeline.classes_ == 'yes')[0][0]
+        prob_churn = prediction_proba[0][yes_class_index]
         
         if prediction[0] == 'yes':
             st.error(f"This customer is likely to **CHURN** (Probability: {prob_churn:.0%})")
@@ -131,6 +137,6 @@ if submit_button:
 st.sidebar.header("How to Run")
 st.sidebar.markdown("""
 1. **Save** this code as `app.py`.
-2. **Ensure** you have the new `churn_pipeline.pkl` in the **same directory**.
+2. **Ensure** you have the `churn_pipeline.pkl` file (from your notebook) in the **same directory**.
 3. **Run:** `streamlit run app.py`
 """)
